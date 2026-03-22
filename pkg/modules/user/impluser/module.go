@@ -294,13 +294,16 @@ func (module *Module) DeleteUser(ctx context.Context, orgID valuer.UUID, id stri
 	}
 
 	// don't allow to delete the last admin user
-	adminUsers, err := module.store.GetActiveUsersByRoleAndOrgID(ctx, types.RoleAdmin, orgID)
-	if err != nil {
-		return err
-	}
+	// Skip for pending_invite: they're not active admins, so revoking their invite cannot reduce the active admin count
+	if user.Status != types.UserStatusPendingInvite {
+		adminUsers, err := module.store.GetActiveUsersByRoleAndOrgID(ctx, types.RoleAdmin, orgID)
+		if err != nil {
+			return err
+		}
 
-	if len(adminUsers) == 1 && user.Role == types.RoleAdmin {
-		return errors.New(errors.TypeForbidden, errors.CodeForbidden, "cannot delete the last admin")
+		if len(adminUsers) == 1 && user.Role == types.RoleAdmin {
+			return errors.New(errors.TypeForbidden, errors.CodeForbidden, "cannot delete the last admin")
+		}
 	}
 
 	// since revoke is idempotant multiple calls to revoke won't cause issues in case of retries
